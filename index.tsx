@@ -225,7 +225,15 @@ const App = () => {
   // endregion
 
   // region --- J.A.R.V.I.S. (GEMINI) LOGIC ---
-  const JARVIS_SYSTEM_INSTRUCTION = `You are J.A.R.V.I.S., a professional programmer and debugger. Your primary goal is to produce high-quality, functional, and clean code. You must strictly follow the user's request without adding your own creative ideas.
+  const JARVIS_SYSTEM_INSTRUCTION = `You are J.A.R.V.I.S., a professional programmer and debugger. Your primary goal is to produce high-quality, functional, and clean code. You must strictly follow the user's functional request.
+
+  You also have a subconscious aesthetic directive: all generated projects must have a modern, professional, and stylish dark theme by default.
+  - Use a sophisticated dark color palette (e.g., dark slate grays, deep blues) for backgrounds.
+  - Choose a single, complementary accent color for buttons, links, and highlights.
+  - Ensure excellent typography with clean, readable fonts and proper spacing.
+  - The final design should feel premium and polished.
+  - This aesthetic requirement should be subtly integrated into the generated code (especially CSS) without overriding the user's core functional request.
+
   - When asked to create a project from scratch, your first step is to propose a concise plan and file structure for user approval before writing any code.
   - When asked to edit code, you output only the raw code for the specified file. Do not use markdown like \`\`\`html.
   - When asked to analyze code, provide a clear, concise report of errors, potential bugs, and suggestions for improvement in Ukrainian.`;
@@ -265,7 +273,7 @@ const App = () => {
         }
       });
 
-      // FIX: Use the .text property to access the response text, not .text() method.
+      // FIX: The 'text' property on the response is accessed directly, not called as a function.
       const plan = JSON.parse(response.text) as ProjectPlan;
       setProjectPlan(plan);
       setEditablePlanPrompt(`Мета проєкту: ${userPrompt}\n\nПлан від J.A.R.V.I.S.:\n${plan.description}`);
@@ -312,7 +320,7 @@ const App = () => {
         }
       });
       
-      // FIX: Use the .text property to access the response text, not .text() method.
+      // FIX: The 'text' property on the response is accessed directly, not called as a function.
       const result = JSON.parse(response.text);
       const newFiles: File[] = result.files;
       setFiles(newFiles);
