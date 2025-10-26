@@ -1,0 +1,5 @@
+{
+  "name": "JS Code Analyzer Pro",
+  "description": "An intelligent JavaScript code analyzer that helps you identify and fix errors across multiple files simultaneously using the power of Gemini.",
+  "requestFramePermissions": []
+}
