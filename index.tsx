@@ -41,6 +41,8 @@ const App = () => {
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [apiKeyReady, setApiKeyReady] = useState(false);
+  const [isAiStudioEnv, setIsAiStudioEnv] = useState(true); // Assume AI Studio env by default
+  const [manualApiKey, setManualApiKey] = useState(''); // For manual key input
 
   const [prompt, setPrompt] = useState('');
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
@@ -60,56 +62,64 @@ const App = () => {
 
   // region --- API KEY MANAGEMENT ---
   useEffect(() => {
-    const initializeApiKey = async () => {
-      while (!window.aistudio) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+    const initialize = async () => {
+      // Wait a moment for window.aistudio to be injected
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      const storedKeyStatus = localStorage.getItem('apiKeyReady');
-      if (storedKeyStatus === 'true') {
-        setApiKeyReady(true);
-        return;
-      }
-
-      try {
+      if (window.aistudio) {
+        console.log("AI Studio environment detected.");
+        setIsAiStudioEnv(true);
         const hasKey = await window.aistudio.hasSelectedApiKey();
         if (hasKey) {
-            setApiKeyReady(true);
-            localStorage.setItem('apiKeyReady', 'true');
+          setApiKeyReady(true);
         } else {
-            setIsApiKeyModalOpen(true);
+          setIsApiKeyModalOpen(true);
         }
-      } catch (e) {
-         console.error("Error checking for API key:", e);
-         setIsApiKeyModalOpen(true);
+      } else {
+        console.log("External environment (e.g., GitHub Pages) detected.");
+        setIsAiStudioEnv(false);
+        const storedKey = localStorage.getItem('userApiKey');
+        if (storedKey) {
+          setApiKeyReady(true);
+        } else {
+          setIsApiKeyModalOpen(true);
+        }
       }
     };
 
-    initializeApiKey();
+    initialize().catch(e => {
+      console.error("Initialization failed, falling back to manual key entry:", e);
+      setIsAiStudioEnv(false);
+      setIsApiKeyModalOpen(true);
+    });
   }, []);
 
   const handleSelectKey = async () => {
     try {
       await window.aistudio.openSelectKey();
       setApiKeyReady(true);
-      localStorage.setItem('apiKeyReady', 'true');
       setIsApiKeyModalOpen(false);
     } catch (e) {
       console.error("Failed to open API key selection:", e);
     }
   };
 
+  const handleSaveManualKey = () => {
+    if (!manualApiKey.trim()) {
+      alert("Будь ласка, введіть ваш API ключ.");
+      return;
+    }
+    localStorage.setItem('userApiKey', manualApiKey.trim());
+    setApiKeyReady(true);
+    setIsApiKeyModalOpen(false);
+    setManualApiKey(''); // Clear the input for security
+  };
+
   const withApiKeyCheck = <T extends any[]>(fn: (...args: T) => Promise<void>) => {
     return async (...args: T) => {
       if (!apiKeyReady) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        if (hasKey) {
-            setApiKeyReady(true);
-            localStorage.setItem('apiKeyReady', 'true');
-        } else {
-          setIsApiKeyModalOpen(true);
-          return;
-        }
+        setIsApiKeyModalOpen(true);
+        return;
       }
       try {
         await fn(...args);
@@ -117,9 +127,11 @@ const App = () => {
         console.error("API call failed:", error);
         if (error.message.includes("entity was not found") || error.message.includes("API key not valid")) {
           setApiKeyReady(false);
-          localStorage.removeItem('apiKeyReady');
+          if (!isAiStudioEnv) {
+            localStorage.removeItem('userApiKey');
+          }
           setIsApiKeyModalOpen(true);
-          alert("Здається, ваш API ключ недійсний. Будь ласка, оберіть дійсний ключ.");
+          alert("Здається, ваш API ключ недійсний. Будь ласка, оберіть або введіть дійсний ключ.");
         }
       }
     };
@@ -238,7 +250,15 @@ const App = () => {
   - When asked to edit code, you output only the raw code for the specified file. Do not use markdown like \`\`\`html.
   - When asked to analyze code, provide a clear, concise report of errors, potential bugs, and suggestions for improvement in Ukrainian.`;
 
-  const getAi = useCallback(() => new GoogleGenAI({ apiKey: process.env.API_KEY }), [apiKeyReady]);
+  const getAi = useCallback(() => {
+    const key = isAiStudioEnv ? process.env.API_KEY : localStorage.getItem('userApiKey');
+    if (!key) {
+      console.error("API Key is not available.");
+      setIsApiKeyModalOpen(true);
+      throw new Error("API Key not found.");
+    }
+    return new GoogleGenAI({ apiKey: key });
+  }, [apiKeyReady, isAiStudioEnv]);
 
   const generatePlan = async (userPrompt: string) => {
     setIsGenerating(true);
@@ -273,7 +293,7 @@ const App = () => {
         }
       });
 
-      // FIX: The 'text' property on the response is accessed directly, not called as a function.
+      // FIX: The .text property should be accessed directly, not called as a function.
       const plan = JSON.parse(response.text) as ProjectPlan;
       setProjectPlan(plan);
       setEditablePlanPrompt(`Мета проєкту: ${userPrompt}\n\nПлан від J.A.R.V.I.S.:\n${plan.description}`);
@@ -320,7 +340,7 @@ const App = () => {
         }
       });
       
-      // FIX: The 'text' property on the response is accessed directly, not called as a function.
+      // FIX: The .text property should be accessed directly, not called as a function.
       const result = JSON.parse(response.text);
       const newFiles: File[] = result.files;
       setFiles(newFiles);
@@ -356,6 +376,7 @@ const App = () => {
         let accumulatedContent = '';
         handleFileContentChange('');
         for await (const chunk of responseStream) {
+            // FIX: The .text property should be accessed directly, not called as a function, for streaming chunks as well.
             accumulatedContent += chunk.text;
             handleFileContentChange(accumulatedContent);
         }
@@ -386,6 +407,7 @@ const App = () => {
         contents: `Analyze the following project files for errors, bugs, and potential improvements. Provide a concise report in markdown format in Ukrainian.\n\n${allFilesContent}`,
         config: { systemInstruction: JARVIS_SYSTEM_INSTRUCTION }
       });
+      // FIX: The .text property should be accessed directly, not called as a function.
       setAnalysisResult(response.text);
     } catch (error) {
       console.error("Error analyzing code:", error);
@@ -413,16 +435,38 @@ const App = () => {
   // region --- RENDER ---
   const renderApiKeyModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-gray-800 p-8 rounded-lg shadow-2xl text-center max-w-md border border-gray-700">
-        <h2 className="text-2xl font-bold mb-4 text-gray-100">Потрібен API Ключ</h2>
-        <p className="mb-6 text-gray-300">Для використання J.A.R.V.I.S. необхідно обрати API ключ Gemini. Ваш ключ використовується лише для поточної сесії і не зберігається на наших серверах.</p>
-        <p className="mb-6 text-sm text-gray-400">Інформація про тарифи: <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ai.google.dev/gemini-api/docs/billing</a>.</p>
-        <button
-          onClick={handleSelectKey}
-          className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg transition-colors w-full"
-        >
-          Обрати API Ключ
-        </button>
+      <div className="bg-gray-800 p-8 rounded-lg shadow-2xl max-w-md w-full border border-gray-700">
+        <h2 className="text-2xl font-bold mb-4 text-gray-100 text-center">Потрібен API Ключ</h2>
+        {isAiStudioEnv ? (
+          <>
+            <p className="mb-6 text-gray-300 text-center">Для використання J.A.R.V.I.S. необхідно обрати API ключ Gemini. Ваш ключ використовується лише для поточної сесії.</p>
+            <p className="mb-6 text-sm text-gray-400 text-center">Інформація про тарифи: <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ai.google.dev/gemini-api/docs/billing</a>.</p>
+            <button
+              onClick={handleSelectKey}
+              className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg transition-colors w-full"
+            >
+              Обрати API Ключ
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mb-4 text-gray-300 text-center">Ви запускаєте цю студію поза середовищем AI Studio. Будь ласка, вставте ваш API ключ Gemini нижче.</p>
+            <input
+              type="password"
+              value={manualApiKey}
+              onChange={(e) => setManualApiKey(e.target.value)}
+              placeholder="Вставте ваш API ключ тут"
+              className="w-full p-2 mb-4 bg-gray-900 text-gray-300 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={handleSaveManualKey}
+              className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-lg transition-colors w-full"
+            >
+              Зберегти та Продовжити
+            </button>
+            <p className="mt-4 text-sm text-gray-400 text-center">Отримати ключ можна на <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">сторінці Google AI Studio</a>.</p>
+          </>
+        )}
       </div>
     </div>
   );
