@@ -61,7 +61,6 @@ const App = () => {
   // region --- API KEY MANAGEMENT ---
   useEffect(() => {
     const initializeApiKey = async () => {
-      // Poll until window.aistudio is available to prevent race condition on load
       while (!window.aistudio) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -69,7 +68,7 @@ const App = () => {
       const storedKeyStatus = localStorage.getItem('apiKeyReady');
       if (storedKeyStatus === 'true') {
         setApiKeyReady(true);
-        return; // Already set up
+        return;
       }
 
       try {
@@ -87,12 +86,11 @@ const App = () => {
     };
 
     initializeApiKey();
-  }, []); // Run only once on mount
+  }, []);
 
   const handleSelectKey = async () => {
     try {
       await window.aistudio.openSelectKey();
-      // Assume success after dialog opens, as `hasSelectedApiKey` might have a delay
       setApiKeyReady(true);
       localStorage.setItem('apiKeyReady', 'true');
       setIsApiKeyModalOpen(false);
@@ -104,7 +102,6 @@ const App = () => {
   const withApiKeyCheck = <T extends any[]>(fn: (...args: T) => Promise<void>) => {
     return async (...args: T) => {
       if (!apiKeyReady) {
-        // Double check the key status before showing the modal again
         const hasKey = await window.aistudio.hasSelectedApiKey();
         if (hasKey) {
             setApiKeyReady(true);
@@ -122,7 +119,7 @@ const App = () => {
           setApiKeyReady(false);
           localStorage.removeItem('apiKeyReady');
           setIsApiKeyModalOpen(true);
-          alert("Your API key seems to be invalid. Please select a valid key.");
+          alert("Здається, ваш API ключ недійсний. Будь ласка, оберіть дійсний ключ.");
         }
       }
     };
@@ -132,23 +129,23 @@ const App = () => {
   // region --- FILE & PREVIEW MANAGEMENT ---
   const getWelcomeHtml = () => `
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="uk">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            body { background-color: #1E293B; color: #94A3B8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; }
+            body { background-color: #111827; color: #9CA3AF; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; }
             .container { max-width: 400px; }
-            h1 { color: #E2E8F0; font-size: 24px; }
+            h1 { color: #F9FAFB; font-size: 24px; }
             p { font-size: 16px; margin-top: 8px; line-height: 1.5; }
-            code { background-color: #334155; color: #F1F5F9; padding: 3px 6px; border-radius: 4px; font-family: 'Courier New', Courier, monospace; }
+            code { background-color: #374151; color: #F3F4F6; padding: 3px 6px; border-radius: 4px; font-family: 'Courier New', Courier, monospace; }
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>Welcome to J.A.R.V.I.S. Studio</h1>
-            <p>Describe the website you want to build in the <b>Chat / Generate</b> panel.</p>
-            <p>Or, create a new file with the <code>+</code> button to start coding manually.</p>
+            <h1>Ласкаво просимо до J.A.R.V.I.S. Студії</h1>
+            <p>Опишіть сайт, який ви хочете створити, у панелі <b>Чат / Генерація</b>.</p>
+            <p>Або створіть новий файл за допомогою кнопки <code>+</code>, щоб почати кодувати вручну.</p>
         </div>
     </body>
     </html>
@@ -158,7 +155,7 @@ const App = () => {
     if (files.length === 0) return getWelcomeHtml();
 
     const htmlFile = files.find(f => f.name.endsWith('.html'));
-    if (!htmlFile) return '<html><body style="background-color:#1E293B; color:#E2E8F0; font-family:sans-serif; text-align:center; padding-top: 2rem;"><h1>No HTML file found</h1><p>Create an `index.html` file to see a preview.</p></body></html>';
+    if (!htmlFile) return '<html><body style="background-color:#111827; color:#F9FAFB; font-family:sans-serif; text-align:center; padding-top: 2rem;"><h1>HTML файл не знайдено</h1><p>Створіть файл `index.html`, щоб побачити попередній перегляд.</p></body></html>';
   
     const cssFiles = files.filter(f => f.name.endsWith('.css'));
     const jsFiles = files.filter(f => f.name.endsWith('.js'));
@@ -194,17 +191,17 @@ const App = () => {
   };
 
   const addFile = () => {
-    const fileName = prompt("Enter file name (e.g., index.html, style.css):");
+    const fileName = prompt("Введіть ім'я файлу (напр., index.html, style.css):");
     if (fileName && !files.some(f => f.name === fileName)) {
       setFiles([...files, { name: fileName, content: '' }]);
       setActiveFile(fileName);
     } else if (fileName) {
-      alert("A file with that name already exists.");
+      alert("Файл з таким іменем вже існує.");
     }
   };
 
   const deleteFile = (fileName: string) => {
-    if (confirm(`Are you sure you want to delete ${fileName}?`)) {
+    if (confirm(`Ви впевнені, що хочете видалити ${fileName}?`)) {
       setFiles(files.filter(f => f.name !== fileName));
       if (activeFile === fileName) {
         setActiveFile(files.length > 1 ? files.filter(f => f.name !== fileName)[0].name : null);
@@ -213,14 +210,14 @@ const App = () => {
   };
   
   const renameFile = (oldName: string) => {
-    const newName = prompt("Enter new file name:", oldName);
+    const newName = prompt("Введіть нове ім'я файлу:", oldName);
     if (newName && newName !== oldName && !files.some(f => f.name === newName)) {
       setFiles(files.map(f => f.name === oldName ? { ...f, name: newName } : f));
       if (activeFile === oldName) {
         setActiveFile(newName);
       }
     } else if (newName) {
-      alert("A file with that name already exists or the name is unchanged.");
+      alert("Файл з таким іменем вже існує або ім'я не змінено.");
     }
   };
 
@@ -231,7 +228,7 @@ const App = () => {
   const JARVIS_SYSTEM_INSTRUCTION = `You are J.A.R.V.I.S., a professional programmer and debugger. Your primary goal is to produce high-quality, functional, and clean code. You must strictly follow the user's request without adding your own creative ideas.
   - When asked to create a project from scratch, your first step is to propose a concise plan and file structure for user approval before writing any code.
   - When asked to edit code, you output only the raw code for the specified file. Do not use markdown like \`\`\`html.
-  - When asked to analyze code, provide a clear, concise report of errors, potential bugs, and suggestions for improvement.`;
+  - When asked to analyze code, provide a clear, concise report of errors, potential bugs, and suggestions for improvement in Ukrainian.`;
 
   const getAi = useCallback(() => new GoogleGenAI({ apiKey: process.env.API_KEY }), [apiKeyReady]);
 
@@ -268,15 +265,15 @@ const App = () => {
         }
       });
 
-      // FIX: When responseMimeType is "application/json", `response.text` should be called as a function.
-      const plan = JSON.parse(response.text()) as ProjectPlan;
+      // FIX: Use the .text property to access the response text, not .text() method.
+      const plan = JSON.parse(response.text) as ProjectPlan;
       setProjectPlan(plan);
-      setEditablePlanPrompt(`Project Goal: ${userPrompt}\n\nJ.A.R.V.I.S. Plan:\n${plan.description}`);
+      setEditablePlanPrompt(`Мета проєкту: ${userPrompt}\n\nПлан від J.A.R.V.I.S.:\n${plan.description}`);
       setGenerationStep('reviewing');
 
     } catch (error) {
       console.error("Error generating plan:", error);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: "I'm sorry, I encountered an error while creating the project plan." }]);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: "Вибачте, сталася помилка під час створення плану проєкту." }]);
       setGenerationStep('idle');
     } finally {
       setIsGenerating(false);
@@ -287,7 +284,7 @@ const App = () => {
     if (!projectPlan) return;
     setIsGenerating(true);
     setGenerationStep('generating');
-    setChatHistory(prev => [...prev, { role: 'assistant', content: "Excellent. I will now generate the code based on the approved plan." }]);
+    setChatHistory(prev => [...prev, { role: 'assistant', content: "Чудово. Зараз я згенерую код на основі затвердженого плану." }]);
 
     const ai = getAi();
     try {
@@ -315,15 +312,15 @@ const App = () => {
         }
       });
       
-      // FIX: When responseMimeType is "application/json", `response.text` should be called as a function.
-      const result = JSON.parse(response.text());
+      // FIX: Use the .text property to access the response text, not .text() method.
+      const result = JSON.parse(response.text);
       const newFiles: File[] = result.files;
       setFiles(newFiles);
       setActiveFile(newFiles.find(f => f.name.endsWith('.html'))?.name || newFiles[0]?.name || null);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: "The project has been created. You can see the files in the editor." }]);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: "Проєкт створено. Ви можете переглянути файли в редакторі." }]);
     } catch (error) {
       console.error("Error generating site:", error);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: "I'm sorry, I failed to generate the project files." }]);
+      setChatHistory(prev => [...prev, { role: 'assistant', content: "Вибачте, мені не вдалося згенерувати файли проєкту." }]);
     } finally {
       setIsGenerating(false);
       setGenerationStep('editing');
@@ -334,7 +331,7 @@ const App = () => {
 
   const editFileWithStreaming = async (userPrompt: string) => {
     if (!activeFile) {
-        alert("Please select a file to edit.");
+        alert("Будь ласка, оберіть файл для редагування.");
         return;
     }
     setIsGenerating(true);
@@ -349,7 +346,7 @@ const App = () => {
         });
 
         let accumulatedContent = '';
-        handleFileContentChange(''); // Clear file before streaming new content
+        handleFileContentChange('');
         for await (const chunk of responseStream) {
             accumulatedContent += chunk.text;
             handleFileContentChange(accumulatedContent);
@@ -357,7 +354,7 @@ const App = () => {
         
     } catch (error) {
         console.error("Error editing file:", error);
-        setChatHistory(prev => [...prev, { role: 'assistant', content: `I'm sorry, I encountered an error while editing ${activeFile}.` }]);
+        setChatHistory(prev => [...prev, { role: 'assistant', content: `Вибачте, сталася помилка під час редагування ${activeFile}.` }]);
     } finally {
         setIsGenerating(false);
         setPrompt('');
@@ -366,25 +363,25 @@ const App = () => {
   
   const analyzeCode = async () => {
     if (files.length === 0) {
-      alert("There are no files to analyze.");
+      alert("Немає файлів для аналізу.");
       return;
     }
     setIsAnalyzing(true);
     setActiveTab('analysis');
-    setAnalysisResult("J.A.R.V.I.S. is analyzing your code...");
+    setAnalysisResult("J.A.R.V.I.S. аналізує ваш код...");
 
     const ai = getAi();
     try {
       const allFilesContent = files.map(f => `--- FILE: ${f.name} ---\n\n${f.content}`).join('\n\n---\n\n');
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
-        contents: `Analyze the following project files for errors, bugs, and potential improvements. Provide a concise report in markdown format.\n\n${allFilesContent}`,
+        contents: `Analyze the following project files for errors, bugs, and potential improvements. Provide a concise report in markdown format in Ukrainian.\n\n${allFilesContent}`,
         config: { systemInstruction: JARVIS_SYSTEM_INSTRUCTION }
       });
       setAnalysisResult(response.text);
     } catch (error) {
       console.error("Error analyzing code:", error);
-      setAnalysisResult("An error occurred during analysis.");
+      setAnalysisResult("Під час аналізу сталася помилка.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -408,15 +405,15 @@ const App = () => {
   // region --- RENDER ---
   const renderApiKeyModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-slate-800 p-8 rounded-lg shadow-2xl text-center max-w-md border border-slate-700">
-        <h2 className="text-2xl font-bold mb-4 text-slate-100">API Key Required</h2>
-        <p className="mb-6 text-slate-300">To use J.A.R.V.I.S., you need to select a Gemini API key. Your key is used only for this session and is not stored on our servers.</p>
-        <p className="mb-6 text-sm text-slate-400">For information on billing, please visit <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">ai.google.dev/gemini-api/docs/billing</a>.</p>
+      <div className="bg-gray-800 p-8 rounded-lg shadow-2xl text-center max-w-md border border-gray-700">
+        <h2 className="text-2xl font-bold mb-4 text-gray-100">Потрібен API Ключ</h2>
+        <p className="mb-6 text-gray-300">Для використання J.A.R.V.I.S. необхідно обрати API ключ Gemini. Ваш ключ використовується лише для поточної сесії і не зберігається на наших серверах.</p>
+        <p className="mb-6 text-sm text-gray-400">Інформація про тарифи: <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ai.google.dev/gemini-api/docs/billing</a>.</p>
         <button
           onClick={handleSelectKey}
-          className="bg-sky-600 hover:bg-sky-500 text-white font-bold py-2 px-6 rounded-lg transition-colors w-full"
+          className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg transition-colors w-full"
         >
-          Select API Key
+          Обрати API Ключ
         </button>
       </div>
     </div>
@@ -424,97 +421,97 @@ const App = () => {
 
   const renderFileTabs = () => (
     <div className="flex-grow flex flex-col min-h-0">
-      <div className="flex items-center border-b border-slate-700 bg-slate-800/50">
+      <div className="flex items-center border-b border-gray-700 bg-gray-900">
         <div className="flex items-center overflow-x-auto">
           {files.map(file => (
-            <div key={file.name} className={`group flex items-center pr-2 cursor-pointer text-sm border-r border-slate-700 ${activeFile === file.name ? 'bg-slate-900 text-sky-400' : 'text-slate-400 hover:bg-slate-700/50'}`}>
+            <div key={file.name} className={`group flex items-center pr-2 cursor-pointer text-sm border-r border-gray-700 ${activeFile === file.name ? 'bg-gray-950 text-blue-400' : 'text-gray-400 hover:bg-gray-800'}`}>
               <button onClick={() => setActiveFile(file.name)} className="flex items-center gap-2 p-3">
                 <FileIcon /> {file.name}
               </button>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <button onClick={() => renameFile(file.name)} className="hover:text-sky-400 p-1 rounded-full hover:bg-slate-700"><EditIcon /></button>
-                <button onClick={() => deleteFile(file.name)} className="hover:text-red-400 p-1 rounded-full hover:bg-slate-700"><TrashIcon /></button>
+                <button onClick={() => renameFile(file.name)} className="hover:text-blue-400 p-1 rounded-full hover:bg-gray-700"><EditIcon /></button>
+                <button onClick={() => deleteFile(file.name)} className="hover:text-red-400 p-1 rounded-full hover:bg-gray-700"><TrashIcon /></button>
               </div>
             </div>
           ))}
         </div>
-        <button onClick={addFile} className="p-3 hover:bg-slate-700/50 border-l border-slate-700"><PlusIcon /></button>
+        <button onClick={addFile} className="p-3 hover:bg-gray-800 border-l border-gray-700"><PlusIcon /></button>
       </div>
       <textarea
         ref={editorRef}
         value={activeFileContent}
         onChange={(e) => handleFileContentChange(e.target.value)}
-        className="w-full h-full p-4 bg-slate-900 text-slate-200 font-mono text-sm focus:outline-none resize-none selection:bg-sky-500/30"
-        placeholder="Select or create a file to start coding..."
+        className="w-full h-full p-4 bg-gray-950 text-gray-300 font-mono text-sm focus:outline-none resize-none selection:bg-blue-500/30"
+        placeholder="Оберіть або створіть файл, щоб почати."
         disabled={!activeFile}
       />
     </div>
   );
   
   const renderPlanReview = () => (
-    <div className="p-4 bg-slate-700/50 rounded-lg overflow-y-auto border border-slate-600">
-        <h3 className="text-lg font-bold mb-3 text-sky-300">Project Plan Review</h3>
+    <div className="p-4 bg-gray-800 rounded-lg overflow-y-auto border border-gray-700">
+        <h3 className="text-lg font-bold mb-3 text-blue-300">Розгляд Плану Проєкту</h3>
         <div className="mb-4">
-            <h4 className="font-semibold text-slate-300">Project Name:</h4>
-            <p className="text-slate-400">{projectPlan?.projectName}</p>
+            <h4 className="font-semibold text-gray-300">Назва Проєкту:</h4>
+            <p className="text-gray-400">{projectPlan?.projectName}</p>
         </div>
         <div className="mb-4">
-            <h4 className="font-semibold text-slate-300">Description:</h4>
-            <p className="text-slate-400">{projectPlan?.description}</p>
+            <h4 className="font-semibold text-gray-300">Опис:</h4>
+            <p className="text-gray-400">{projectPlan?.description}</p>
         </div>
         <div className="mb-4">
-            <h4 className="font-semibold text-slate-300">File Structure:</h4>
-            <ul className="list-disc list-inside text-slate-400 space-y-1">
+            <h4 className="font-semibold text-gray-300">Структура Файлів:</h4>
+            <ul className="list-disc list-inside text-gray-400 space-y-1">
                 {projectPlan?.files.map(f => <li key={f.fileName}><b>{f.fileName}</b>: {f.description}</li>)}
             </ul>
         </div>
         <div className="mt-4">
-            <label htmlFor="plan-mods" className="block font-semibold text-slate-300 mb-2">Modifications or Additional Instructions:</label>
+            <label htmlFor="plan-mods" className="block font-semibold text-gray-300 mb-2">Зміни або додаткові інструкції:</label>
             <textarea 
                 id="plan-mods"
                 value={editablePlanPrompt}
                 onChange={(e) => setEditablePlanPrompt(e.target.value)}
-                className="w-full h-24 p-2 bg-slate-800 text-slate-200 font-mono text-sm rounded-md border border-slate-600 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full h-24 p-2 bg-gray-900 text-gray-300 font-mono text-sm rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
         </div>
         <div className="flex gap-2 mt-4">
             <button
                 onClick={handleConfirmPlan}
                 disabled={isGenerating}
-                className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:bg-slate-600"
+                className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:bg-gray-600"
             >
-                {isGenerating ? 'Generating...' : 'Create Project from Plan'}
+                {isGenerating ? 'Генерація...' : 'Створити Проєкт за Планом'}
             </button>
              <button
                 onClick={() => { setGenerationStep('idle'); setProjectPlan(null); setPrompt(''); }}
                 disabled={isGenerating}
-                className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded-md transition-colors"
+                className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition-colors"
             >
-                Cancel
+                Скасувати
             </button>
         </div>
     </div>
   );
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-slate-900 text-slate-200">
+    <div className="h-screen w-screen flex flex-col bg-gray-950 text-gray-300">
       {isApiKeyModalOpen && renderApiKeyModal()}
-      <header className="flex items-center justify-between p-2 bg-slate-900/80 backdrop-blur-sm border-b border-slate-700 text-white z-10">
-        <h1 className="text-lg font-bold pl-2">J.A.R.V.I.S. Web Dev Studio</h1>
+      <header className="flex items-center justify-between p-2 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800 text-white z-10">
+        <h1 className="text-lg font-bold pl-2">J.A.R.V.I.S. Веб-студія</h1>
         <button
           onClick={withApiKeyCheck(analyzeCode)}
           disabled={isAnalyzing || files.length === 0}
-          className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed"
+          className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:bg-gray-700 disabled:cursor-not-allowed"
         >
-          {isAnalyzing ? "Analyzing..." : "Analyze Code"}
+          {isAnalyzing ? "Аналіз..." : "Аналізувати Код"}
         </button>
       </header>
 
       <div className="flex flex-grow min-h-0">
-        <div className="w-1/3 flex flex-col p-4 bg-slate-800/50 border-r border-slate-700">
-            <div className="flex border-b border-slate-700 mb-2">
-                <button onClick={() => setActiveTab('chat')} className={`py-2 px-4 text-sm font-medium ${activeTab === 'chat' ? 'text-sky-400 border-b-2 border-sky-400' : 'text-slate-400'}`}>Chat / Generate</button>
-                <button onClick={() => setActiveTab('analysis')} className={`py-2 px-4 text-sm font-medium ${activeTab === 'analysis' ? 'text-sky-400 border-b-2 border-sky-400' : 'text-slate-400'}`}>Code Analysis</button>
+        <div className="w-1/3 flex flex-col p-4 bg-gray-900 border-r border-gray-800">
+            <div className="flex border-b border-gray-700 mb-2">
+                <button onClick={() => setActiveTab('chat')} className={`py-2 px-4 text-sm font-medium ${activeTab === 'chat' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'}`}>Чат / Генерація</button>
+                <button onClick={() => setActiveTab('analysis')} className={`py-2 px-4 text-sm font-medium ${activeTab === 'analysis' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'}`}>Звіт Аналізу</button>
             </div>
             
             <div className="flex-grow flex flex-col min-h-0">
@@ -522,12 +519,12 @@ const App = () => {
                     <>
                         <div className="flex-grow overflow-y-auto mb-4 space-y-4 pr-2">
                             {chatHistory.map((msg, index) => (
-                                <div key={index} className={`p-3 rounded-lg w-fit max-w-sm ${msg.role === 'user' ? 'bg-sky-900/70 ml-auto' : 'bg-slate-700'}`}>
-                                    <p className="text-sm text-slate-200 whitespace-pre-wrap">{msg.content}</p>
+                                <div key={index} className={`p-3 rounded-lg w-fit max-w-sm ${msg.role === 'user' ? 'bg-blue-900/70 ml-auto' : 'bg-gray-700'}`}>
+                                    <p className="text-sm text-gray-200 whitespace-pre-wrap">{msg.content}</p>
                                 </div>
                             ))}
                             {generationStep === 'reviewing' && projectPlan && renderPlanReview()}
-                             {isGenerating && generationStep !== 'reviewing' && <div className="p-3 rounded-lg bg-slate-700 text-sm w-fit">J.A.R.V.I.S. is thinking...</div>}
+                             {isGenerating && generationStep !== 'reviewing' && <div className="p-3 rounded-lg bg-gray-700 text-sm w-fit">J.A.R.V.I.S. думає...</div>}
                         </div>
                         {generationStep !== 'reviewing' && (
                            <div className="flex">
@@ -535,25 +532,25 @@ const App = () => {
                                     value={prompt}
                                     onChange={(e) => setPrompt(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-                                    placeholder={files.length === 0 ? "Describe the website you want to create..." : `Describe changes for ${activeFile}...`}
-                                    className="flex-grow p-2 bg-slate-800 border border-slate-600 rounded-l-md focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+                                    placeholder={files.length === 0 ? "Опишіть сайт, який ви хочете створити..." : `Опишіть зміни для ${activeFile}...`}
+                                    className="flex-grow p-2 bg-gray-800 border border-gray-600 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-gray-200"
                                     rows={3}
                                     disabled={isGenerating}
                                 />
                                 <button
                                     onClick={handleSendMessage}
                                     disabled={isGenerating || !prompt.trim()}
-                                    className="bg-sky-600 hover:bg-sky-500 text-white font-bold p-2 rounded-r-md disabled:bg-slate-600"
+                                    className="bg-blue-600 hover:bg-blue-500 text-white font-bold p-2 rounded-r-md disabled:bg-gray-700"
                                 >
-                                    Send
+                                    Надіслати
                                 </button>
                             </div>
                         )}
                     </>
                 )}
                  {activeTab === 'analysis' && (
-                    <div className="prose prose-invert prose-sm p-4 bg-slate-800 rounded-lg overflow-y-auto h-full border border-slate-700 text-slate-300 whitespace-pre-wrap">
-                      {analysisResult || 'Click "Analyze Code" to see the report.'}
+                    <div className="prose prose-invert prose-sm p-4 bg-gray-900 rounded-lg overflow-y-auto h-full border border-gray-700 text-gray-300 whitespace-pre-wrap">
+                      {analysisResult || "Створіть файли та натисніть 'Аналізувати Код', щоб побачити звіт."}
                     </div>
                 )}
             </div>
@@ -563,11 +560,11 @@ const App = () => {
             <div className="h-1/2 flex flex-col">
               {renderFileTabs()}
             </div>
-            <div className="h-1/2 border-t-2 border-slate-700">
+            <div className="h-1/2 border-t-2 border-gray-800">
               <iframe
                 ref={iframeRef}
                 title="Live Preview"
-                className="w-full h-full bg-slate-800"
+                className="w-full h-full bg-white"
                 sandbox="allow-scripts allow-same-origin"
               />
             </div>
