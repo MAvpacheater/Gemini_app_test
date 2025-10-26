@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { KeyIcon } from './icons';
+import { KeyIcon } from './icons.tsx';
 
 interface ApiKeyModalProps {
   onSave: (apiKey: string) => void;

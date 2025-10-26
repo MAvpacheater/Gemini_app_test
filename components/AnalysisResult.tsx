@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { AnalysisReport, FileAnalysis } from '../types';
-import { SparklesIcon, FileCodeIcon, CodeBracketIcon } from './icons';
+import { AnalysisReport, FileAnalysis } from '../types.ts';
+import { SparklesIcon, FileCodeIcon, CodeBracketIcon } from './icons.tsx';
 
 interface AnalysisResultProps {
   report: AnalysisReport | null;

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { CodeFile, AnalysisReport } from '../types';
+import { CodeFile, AnalysisReport } from '../types.ts';
 
 const analysisSchema = {
   type: Type.OBJECT,

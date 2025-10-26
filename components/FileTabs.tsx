@@ -1,7 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { CodeFile } from '../types';
-import { PlusIcon, XIcon } from './icons';
+import { CodeFile } from '../types.ts';
+import { PlusIcon, XIcon } from './icons.tsx';
 
 interface FileTabsProps {
   files: CodeFile[];

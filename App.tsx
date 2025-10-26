@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { FileTabs } from './components/FileTabs';
-import { CodeEditor } from './components/CodeEditor';
-import { AnalysisResult } from './components/AnalysisResult';
-import { ApiKeyModal } from './components/ApiKeyModal';
-import { SparklesIcon, KeyIcon } from './components/icons';
-import { analyzeCode } from './services/geminiService';
-import { CodeFile, AnalysisReport } from './types';
+import { FileTabs } from './components/FileTabs.tsx';
+import { CodeEditor } from './components/CodeEditor.tsx';
+import { AnalysisResult } from './components/AnalysisResult.tsx';
+import { ApiKeyModal } from './components/ApiKeyModal.tsx';
+import { SparklesIcon, KeyIcon } from './components/icons.tsx';
+import { analyzeCode } from './services/geminiService.ts';
+import { CodeFile, AnalysisReport } from './types.ts';
 
 const App: React.FC = () => {
   const createNewFile = (index: number): CodeFile => ({
