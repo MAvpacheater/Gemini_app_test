@@ -39,6 +39,9 @@ const UploadIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
 );
 const DownloadIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+);
+const DownloadZipIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 );
 // endregion
@@ -52,10 +55,11 @@ const App = () => {
   const [isAiStudioEnv, setIsAiStudioEnv] = useState(true);
   const [manualApiKey, setManualApiKey] = useState('');
 
-  // FIX: Renamed state variable `prompt` to `chatInput` to avoid conflict with the global `window.prompt` function. This resolves errors where `prompt(...)` was being called on a string.
   const [chatInput, setChatInput] = useState('');
-  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant', content: string }[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'assistant' | 'system', content: string }[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
+  const [timerDisplay, setTimerDisplay] = useState('00:00');
   
   const [generationStep, setGenerationStep] = useState<GenerationStep>('idle');
   const [projectPlan, setProjectPlan] = useState<ProjectPlan | null>(null);
@@ -71,9 +75,10 @@ const App = () => {
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const timerIntervalRef = useRef<number | null>(null);
   // endregion
 
-  // region --- API KEY MANAGEMENT ---
+  // region --- API KEY MANAGEMENT & TIMER ---
   useEffect(() => {
     const initialize = async () => {
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -89,6 +94,27 @@ const App = () => {
     };
     initialize().catch(() => { setIsAiStudioEnv(false); setIsApiKeyModalOpen(true); });
   }, []);
+
+  useEffect(() => {
+    if (isGenerating && generationStartTime) {
+        timerIntervalRef.current = window.setInterval(() => {
+            const elapsed = Date.now() - generationStartTime;
+            const seconds = Math.floor((elapsed / 1000) % 60);
+            const minutes = Math.floor((elapsed / (1000 * 60)) % 60);
+            setTimerDisplay(
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+            );
+        }, 1000);
+    } else {
+        if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+        }
+    }
+    return () => {
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [isGenerating, generationStartTime]);
 
   const handleSelectKey = async () => {
     try {
@@ -193,6 +219,17 @@ const App = () => {
     if (e.target) e.target.value = '';
   };
   
+  const handleDownloadFile = (file: File) => {
+    const blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  };
+    
   const handleDownloadZip = async () => {
     if (files.length === 0) { alert("Немає файлів для завантаження."); return; }
     const zip = new JSZip();
@@ -273,6 +310,7 @@ const App = () => {
   }, [apiKeyReady, isAiStudioEnv]);
 
   const generatePlan = async (userPrompt: string) => {
+    setGenerationStartTime(Date.now());
     setIsGenerating(true);
     setGenerationStep('planning');
     setChatHistory(prev => [...prev, { role: 'user', content: userPrompt }]);
@@ -292,42 +330,61 @@ const App = () => {
       console.error("Error generating plan:", error);
       setChatHistory(prev => [...prev, { role: 'assistant', content: "Вибачте, сталася помилка під час створення плану проєкту." }]);
       setGenerationStep('idle');
-    } finally { setIsGenerating(false); }
+    } finally { 
+        if (generationStartTime) {
+            const duration = Date.now() - generationStartTime;
+            const seconds = (duration / 1000).toFixed(1);
+            setChatHistory(prev => [...prev, { role: 'system', content: `Відповідь була обдумана за ${seconds} сек.` }]);
+            setGenerationStartTime(null);
+        }
+        setIsGenerating(false); 
+    }
   };
 
   const generateSiteFromPlan = async () => {
     if (!projectPlan) return;
+    setGenerationStartTime(Date.now());
     setIsGenerating(true);
     setGenerationStep('generating');
-    setChatHistory(prev => [...prev, { role: 'assistant', content: "Чудово. Зараз я згенерую код на основі затвердженого плану." }]);
+    setChatHistory(prev => [...prev, { role: 'assistant', content: "Чудово. Починаю генерацію файлів по черзі..." }]);
+    setFiles([]); 
     const ai = getAi();
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
-        contents: `Generate the code for the following project plan. The user's original goal was: "${editablePlanPrompt.split('\n')[0]}". The agreed plan is: ${JSON.stringify(projectPlan)}. The user has provided final instructions: "${editablePlanPrompt}". Create all the necessary files with high-quality code. Ensure the HTML file links to the CSS and JS files correctly if they are created.`,
-        config: { systemInstruction: JARVIS_SYSTEM_INSTRUCTION, responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { files: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { fileName: { type: Type.STRING }, content: { type: Type.STRING } } } } } } }
-      });
-      const result = JSON.parse(response.text);
-      const newFiles: File[] = result.files.map((file: { fileName: string; content: string }) => ({
-        name: file.fileName,
-        content: file.content,
-      }));
-      setFiles(newFiles);
-      setActiveFile(newFiles.find(f => f.name.endsWith('.html'))?.name || newFiles[0]?.name || null);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: "Проєкт створено. Ви можете переглянути файли в редакторі." }]);
+        const generatedFiles: File[] = [];
+        for (const fileToGenerate of projectPlan.files) {
+            setChatHistory(prev => [...prev, { role: 'system', content: `Генерую ${fileToGenerate.fileName}...` }]);
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: `Generate ONLY the raw code for the file named '${fileToGenerate.fileName}'. This file is part of the project '${projectPlan.projectName}' (${projectPlan.description}). The specific purpose of this file is: '${fileToGenerate.description}'. The user's original goal was: "${editablePlanPrompt.split('\n')[0]}". Do not include any explanation, markdown, or anything else. Just the code.`,
+                config: { systemInstruction: JARVIS_SYSTEM_INSTRUCTION }
+            });
+            const newFile: File = { name: fileToGenerate.fileName, content: response.text.trim() };
+            generatedFiles.push(newFile);
+            setFiles([...generatedFiles]);
+            setActiveFile(newFile.name);
+            await new Promise(res => setTimeout(res, 200));
+        }
+        setChatHistory(prev => [...prev, { role: 'assistant', content: "Проєкт створено. Ви можете переглянути файли в редакторі." }]);
     } catch (error) {
-      console.error("Error generating site:", error);
-      setChatHistory(prev => [...prev, { role: 'assistant', content: "Вибачте, мені не вдалося згенерувати файли проєкту." }]);
+        console.error("Error generating site sequentially:", error);
+        setChatHistory(prev => [...prev, { role: 'assistant', content: "Вибачте, мені не вдалося згенерувати файли проєкту." }]);
     } finally {
-      setIsGenerating(false);
-      setGenerationStep('editing');
-      setChatInput('');
-      setProjectPlan(null);
+        if (generationStartTime) {
+            const duration = Date.now() - generationStartTime;
+            const seconds = (duration / 1000).toFixed(1);
+            setChatHistory(prev => [...prev, { role: 'system', content: `Генерація завершена за ${seconds} сек.` }]);
+            setGenerationStartTime(null);
+        }
+        setIsGenerating(false);
+        setGenerationStep('editing');
+        setChatInput('');
+        setProjectPlan(null);
     }
   };
 
   const editFileWithStreaming = async (userPrompt: string) => {
     if (!activeFile) { alert("Будь ласка, оберіть файл для редагування."); return; }
+    setGenerationStartTime(Date.now());
     setIsGenerating(true);
     setChatHistory(prev => [...prev, { role: 'user', content: userPrompt }]);
     const ai = getAi();
@@ -346,7 +403,16 @@ const App = () => {
     } catch (error) {
         console.error("Error editing file:", error);
         setChatHistory(prev => [...prev, { role: 'assistant', content: `Вибачте, сталася помилка під час редагування ${activeFile}.` }]);
-    } finally { setIsGenerating(false); setChatInput(''); }
+    } finally { 
+        if (generationStartTime) {
+            const duration = Date.now() - generationStartTime;
+            const seconds = (duration / 1000).toFixed(1);
+            setChatHistory(prev => [...prev, { role: 'system', content: `Редагування завершено за ${seconds} сек.` }]);
+            setGenerationStartTime(null);
+        }
+        setIsGenerating(false); 
+        setChatInput(''); 
+    }
   };
   
   const analyzeCode = async () => {
@@ -408,14 +474,15 @@ const App = () => {
             <div key={file.name} className={`group flex items-center pr-2 cursor-pointer text-sm border-r border-gray-700 ${activeFile === file.name ? 'bg-gray-950 text-blue-400' : 'text-gray-400 hover:bg-gray-800'}`}>
               <button onClick={() => setActiveFile(file.name)} className="flex items-center gap-2 p-3"><FileIcon /> {file.name}</button>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <button onClick={() => renameFile(file.name)} className="hover:text-blue-400 p-1 rounded-full hover:bg-gray-700"><EditIcon /></button>
-                <button onClick={() => deleteFile(file.name)} className="hover:text-red-400 p-1 rounded-full hover:bg-gray-700"><TrashIcon /></button>
+                <button onClick={() => handleDownloadFile(file)} title="Завантажити файл" className="hover:text-green-400 p-1 rounded-full hover:bg-gray-700"><DownloadIcon /></button>
+                <button onClick={() => renameFile(file.name)} title="Перейменувати файл" className="hover:text-blue-400 p-1 rounded-full hover:bg-gray-700"><EditIcon /></button>
+                <button onClick={() => deleteFile(file.name)} title="Видалити файл" className="hover:text-red-400 p-1 rounded-full hover:bg-gray-700"><TrashIcon /></button>
               </div>
             </div>
           ))}
         </div>
         <input type="file" multiple ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-        <button onClick={() => fileInputRef.current?.click()} title="Завантажити файл" className="p-3 hover:bg-gray-800 border-l border-gray-700"><UploadIcon /></button>
+        <button onClick={() => fileInputRef.current?.click()} title="Завантажити файл(и)" className="p-3 hover:bg-gray-800 border-l border-gray-700"><UploadIcon /></button>
         <button onClick={addFile} title="Створити новий файл" className="p-3 hover:bg-gray-800 border-l border-gray-700"><PlusIcon /></button>
       </div>
       <textarea ref={editorRef} value={activeFileContent} onChange={(e) => handleFileContentChange(e.target.value)} className="w-full h-full p-4 bg-gray-950 text-gray-300 font-mono text-sm focus:outline-none resize-none selection:bg-blue-500/30" placeholder="Оберіть або створіть файл, щоб почати." disabled={!activeFile}/>
@@ -433,9 +500,31 @@ const App = () => {
             <textarea id="plan-mods" value={editablePlanPrompt} onChange={(e) => setEditablePlanPrompt(e.target.value)} className="w-full h-24 p-2 bg-gray-900 text-gray-300 font-mono text-sm rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
         </div>
         <div className="flex gap-2 mt-4">
-            <button onClick={handleConfirmPlan} disabled={isGenerating} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:bg-gray-600">{isGenerating ? 'Генерація...' : 'Створити Проєкт за Планом'}</button>
+            <button onClick={handleConfirmPlan} disabled={isGenerating} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:bg-gray-600 flex items-center justify-center">
+                {isGenerating ? (
+                    <>
+                        <span className="mr-2">Генерація...</span>
+                        <span className="font-mono">{timerDisplay}</span>
+                    </>
+                ) : 'Створити Проєкт за Планом'}
+            </button>
             <button onClick={() => { setGenerationStep('idle'); setProjectPlan(null); setChatInput(''); }} disabled={isGenerating} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition-colors">Скасувати</button>
         </div>
+    </div>
+  );
+
+  const renderWelcomeMessage = () => (
+    <div className="p-4 bg-gray-800 rounded-lg border border-gray-700 text-center mx-auto max-w-md my-4">
+        <h2 className="text-xl font-bold text-blue-300 mb-2">J.A.R.V.I.S.</h2>
+        <p className="text-sm text-gray-400 mb-3">Ваш персональний асистент з програмування.</p>
+        <p className="text-sm text-left text-gray-300 mb-1"><strong className="font-semibold">Що я можу:</strong></p>
+        <ul className="list-disc list-inside text-sm text-left text-gray-400 space-y-1 mb-3">
+            <li>Створювати вебсайти з нуля за вашим описом.</li>
+            <li>Редагувати існуючі файли за вашими інструкціями.</li>
+            <li>Аналізувати код на наявність помилок та пропонувати покращення.</li>
+        </ul>
+        <p className="text-sm text-left text-gray-300"><strong className="font-semibold">Порада:</strong></p>
+        <p className="text-sm text-left text-gray-400">Щоб почати, просто опишіть сайт, який ви хочете створити, у полі нижче.</p>
     </div>
   );
 
@@ -445,7 +534,7 @@ const App = () => {
       <header className="flex items-center justify-between p-2 bg-gray-950/80 backdrop-blur-sm border-b border-gray-800 text-white z-10 shrink-0">
         <h1 className="text-lg font-bold pl-2">J.A.R.V.I.S. Веб-студія</h1>
         <div className="flex items-center gap-2">
-            <button onClick={handleDownloadZip} disabled={files.length === 0} className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:bg-gray-700 disabled:cursor-not-allowed"><DownloadIcon /> Завантажити ZIP</button>
+            <button onClick={handleDownloadZip} disabled={files.length === 0} className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:bg-gray-700 disabled:cursor-not-allowed"><DownloadZipIcon /> Завантажити ZIP</button>
             <button onClick={withApiKeyCheck(analyzeCode)} disabled={isAnalyzing || files.length === 0} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-md transition-colors disabled:bg-gray-700 disabled:cursor-not-allowed">{isAnalyzing ? "Аналіз..." : "Аналізувати Код"}</button>
         </div>
       </header>
@@ -460,14 +549,24 @@ const App = () => {
                 {activeTab === 'chat' && (
                     <>
                         <div className="flex-grow overflow-y-auto mb-4 space-y-4 pr-2">
-                            {chatHistory.map((msg, index) => (<div key={index} className={`p-3 rounded-lg w-fit max-w-sm ${msg.role === 'user' ? 'bg-blue-900/70 ml-auto' : 'bg-gray-700'}`}><p className="text-sm text-gray-200 whitespace-pre-wrap">{msg.content}</p></div>))}
+                            {chatHistory.length === 0 && generationStep === 'idle' && renderWelcomeMessage()}
+                            {chatHistory.map((msg, index) => {
+                                if (msg.role === 'system') return <div key={index} className="mx-auto my-2 py-1 px-4 bg-gray-600 text-gray-300 text-xs rounded-full w-fit">{msg.content}</div>;
+                                return <div key={index} className={`p-3 rounded-lg w-fit max-w-sm ${msg.role === 'user' ? 'bg-blue-900/70 ml-auto' : 'bg-gray-700'}`}><p className="text-sm text-gray-200 whitespace-pre-wrap">{msg.content}</p></div>
+                            })}
                             {generationStep === 'reviewing' && projectPlan && renderPlanReview()}
-                             {isGenerating && generationStep !== 'reviewing' && <div className="p-3 rounded-lg bg-gray-700 text-sm w-fit">J.A.R.V.I.S. думає...</div>}
+                             {isGenerating && generationStep !== 'reviewing' && generationStep !== 'planning' && <div className="p-3 rounded-lg bg-gray-700 text-sm w-fit">J.A.R.V.I.S. думає...</div>}
                         </div>
                         {generationStep !== 'reviewing' && (
                            <div className="flex">
                                 <textarea value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} placeholder={files.length === 0 ? "Опишіть сайт, який ви хочете створити..." : `Опишіть зміни для ${activeFile}...`} className="flex-grow p-2 bg-gray-800 border border-gray-600 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-gray-200" rows={3} disabled={isGenerating}/>
-                                <button onClick={handleSendMessage} disabled={isGenerating || !chatInput.trim()} className="bg-blue-600 hover:bg-blue-500 text-white font-bold p-2 rounded-r-md disabled:bg-gray-700">Надіслати</button>
+                                {isGenerating ? (
+                                    <div className="bg-gray-700 text-white font-mono font-bold p-2 rounded-r-md w-28 flex items-center justify-center text-lg">
+                                        {timerDisplay}
+                                    </div>
+                                ) : (
+                                    <button onClick={handleSendMessage} disabled={!chatInput.trim()} className="bg-blue-600 hover:bg-blue-500 text-white font-bold p-2 rounded-r-md disabled:bg-gray-700 w-28">Надіслати</button>
+                                )}
                             </div>
                         )}
                     </>
