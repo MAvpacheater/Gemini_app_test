@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+// FIX: Add missing React and ReactDOM imports to enable JSX and DOM rendering.
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -120,16 +121,14 @@ const analysisSchema = {
   required: ['summary', 'files']
 };
 
-const analyzeCode = async (files: CodeFile[], apiKey: string): Promise<AnalysisReport> => {
-  if (!apiKey) {
-    throw new Error("API ключ не надано. Будь ласка, введіть ваш ключ, щоб продовжити.");
-  }
-  
+// FIX: Update analyzeCode to use process.env.API_KEY and remove apiKey parameter.
+const analyzeCode = async (files: CodeFile[]): Promise<AnalysisReport> => {
   if (files.length === 0 || files.every(f => f.content.trim() === '')) {
     throw new Error("Немає коду для аналізу.");
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  // FIX: Initialize GoogleGenAI with API key from environment variables.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const formattedFiles = files.map(file => `
 // FILE: ${file.name}
@@ -183,80 +182,10 @@ ${file.content}
 
 
 // --- From components/ApiKeyModal.tsx ---
-interface ApiKeyModalProps {
-  onSave: (apiKey: string) => void;
-}
-
-const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onSave }) => {
-  const [key, setKey] = useState('');
-
-  const handleSave = () => {
-    if (key.trim()) {
-      onSave(key.trim());
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-        handleSave();
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-8 max-w-lg w-full m-4">
-        <div className="flex items-center mb-4">
-          <KeyIcon className="h-8 w-8 text-yellow-400 mr-3 flex-shrink-0" />
-          <h2 className="text-2xl font-bold text-white">Введіть ваш API ключ Gemini</h2>
-        </div>
-        <p className="text-gray-400 mb-6 text-sm">
-          Для аналізу коду потрібен ваш власний API ключ Google AI. Додаток не зберігає ваш ключ, він використовується лише для запитів протягом цієї сесії.
-        </p>
-        <div className="mb-6">
-          <label htmlFor="apiKey" className="block text-sm font-medium text-gray-300 mb-2">
-            API Ключ
-          </label>
-          <input
-            id="apiKey"
-            type="password"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Вставте ваш ключ тут..."
-            className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            autoFocus
-          />
-        </div>
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <a
-            href="https://aistudio.google.com/app/apikey"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-blue-400 hover:underline"
-          >
-            Отримати API ключ
-          </a>
-          <button
-            onClick={handleSave}
-            disabled={!key.trim()}
-            className="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed font-semibold transition-colors"
-          >
-            Зберегти та продовжити
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+// FIX: Removed ApiKeyModal component to adhere to the guideline of using environment variables for API keys.
 
 
 // --- From components/AnalysisResult.tsx ---
-interface AnalysisResultProps {
-  report: AnalysisReport | null;
-  isLoading: boolean;
-  error: string | null;
-}
-
 const WelcomeMessage = () => (
   <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
     <SparklesIcon className="h-16 w-16 mb-4" />
@@ -300,7 +229,7 @@ const ReportDisplay: React.FC<{ report: AnalysisReport }> = ({ report }) => (
 );
 
 const FileResult: React.FC<{ file: FileAnalysis }> = ({ file }) => {
-    const [isCodeVisible, setIsCodeVisible] = useState(false);
+    const [isCodeVisible, setIsCodeVisible] = React.useState(false);
 
     return (
       <div className="mb-6">
@@ -353,7 +282,7 @@ const FileResult: React.FC<{ file: FileAnalysis }> = ({ file }) => {
     );
 };
 
-const AnalysisResult: React.FC<AnalysisResultProps> = ({ report, isLoading, error }) => {
+const AnalysisResult: React.FC<any> = ({ report, isLoading, error }) => {
   return (
     <div className="h-full w-full bg-gray-800/30 overflow-y-auto">
       {isLoading ? (
@@ -371,12 +300,7 @@ const AnalysisResult: React.FC<AnalysisResultProps> = ({ report, isLoading, erro
 
 
 // --- From components/CodeEditor.tsx ---
-interface CodeEditorProps {
-  content: string;
-  onChange: (content: string) => void;
-}
-
-const CodeEditor: React.FC<CodeEditorProps> = ({ content, onChange }) => {
+const CodeEditor: React.FC<any> = ({ content, onChange }) => {
   return (
     <div className="h-full w-full bg-gray-900">
       <textarea
@@ -392,16 +316,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ content, onChange }) => {
 
 
 // --- From components/FileTabs.tsx ---
-interface FileTabsProps {
-  files: CodeFile[];
-  activeFileId: string;
-  onAddFile: () => void;
-  onSelectFile: (id: string) => void;
-  onRemoveFile: (id: string) => void;
-  onRenameFile: (id: string, newName: string) => void;
-}
-
-const FileTabs: React.FC<FileTabsProps> = ({
+const FileTabs: React.FC<any> = ({
   files,
   activeFileId,
   onAddFile,
@@ -409,11 +324,11 @@ const FileTabs: React.FC<FileTabsProps> = ({
   onRemoveFile,
   onRenameFile,
 }) => {
-  const [editingTabId, setEditingTabId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [editingTabId, setEditingTabId] = React.useState<string | null>(null);
+  const [editingName, setEditingName] = React.useState('');
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (editingTabId && inputRef.current) {
       inputRef.current.focus();
     }
@@ -497,15 +412,14 @@ const App: React.FC = () => {
     content: '',
   });
 
-  const [files, setFiles] = useState<CodeFile[]>([createNewFile(1)]);
-  const [activeFileId, setActiveFileId] = useState<string>(files[0].id);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [analysisReport, setAnalysisReport] = useState<AnalysisReport | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState<string>('');
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(true);
+  const [files, setFiles] = React.useState<CodeFile[]>([createNewFile(1)]);
+  const [activeFileId, setActiveFileId] = React.useState<string>(files[0].id);
+  const [isLoading, setIsLoading] = React.useState<boolean>(false);
+  const [analysisReport, setAnalysisReport] = React.useState<AnalysisReport | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  // FIX: Removed state for API key and modal to use environment variables.
 
-  const activeFile = useMemo(() => files.find(f => f.id === activeFileId), [files, activeFileId]);
+  const activeFile = React.useMemo(() => files.find(f => f.id === activeFileId), [files, activeFileId]);
 
   const handleAddFile = () => {
     const newFile = createNewFile(files.length + 1);
@@ -539,18 +453,14 @@ const App: React.FC = () => {
     setFiles(files.map(f => (f.id === id ? { ...f, name: newName } : f)));
   };
 
-  const handleAnalyze = useCallback(async () => {
-    if (!apiKey) {
-      setError("API ключ не встановлено. Будь ласка, введіть ключ.");
-      setIsApiKeyModalOpen(true);
-      return;
-    }
-
+  // FIX: Updated handleAnalyze to remove API key logic.
+  const handleAnalyze = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
     setAnalysisReport(null);
     try {
-      const report = await analyzeCode(files, apiKey);
+      // FIX: Call analyzeCode without passing the API key.
+      const report = await analyzeCode(files);
       setAnalysisReport(report);
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -561,32 +471,21 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [files, apiKey]);
+  }, [files]);
 
-  const handleSaveApiKey = (key: string) => {
-    setApiKey(key);
-    setIsApiKeyModalOpen(false);
-    if (error?.includes("API ключ")) {
-      setError(null);
-    }
-  };
+  // FIX: Removed handleSaveApiKey function.
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
-      {isApiKeyModalOpen && <ApiKeyModal onSave={handleSaveApiKey} />}
+      {/* FIX: Removed ApiKeyModal component. */}
       <header className="flex-shrink-0 p-3 bg-gray-900/80 backdrop-blur-sm border-b border-gray-700/50 flex justify-between items-center">
         <h1 className="text-xl font-bold text-gray-200">Аналізатор коду JS Pro</h1>
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setIsApiKeyModalOpen(true)}
-            className="p-2 rounded-md hover:bg-gray-700 transition-colors"
-            title="Змінити API ключ"
-          >
-            <KeyIcon className="h-5 w-5 text-gray-400" />
-          </button>
+          {/* FIX: Removed button to change API key. */}
           <button
             onClick={handleAnalyze}
-            disabled={isLoading || !apiKey}
+            // FIX: The button is disabled only when loading.
+            disabled={isLoading}
             className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:bg-gray-600/50 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors duration-200 font-semibold"
           >
             <SparklesIcon className="h-5 w-5 mr-2" />
