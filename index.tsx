@@ -1,20 +1,13 @@
 // FIX: Add missing React and ReactDOM imports to enable JSX and DOM rendering.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Chat } from "@google/genai";
 
 // --- TYPES ---
 interface CodeFile {
   id: string;
   name: string;
   content: string;
-}
-
-interface SiteGenerationResponse {
-    files: Array<{
-        fileName: string;
-        content: string;
-    }>;
 }
 
 interface AnalysisError {
@@ -55,12 +48,6 @@ const SparklesIcon: React.FC<{ className?: string }> = ({ className = "h-6 w-6" 
   </svg>
 );
 
-const CodeBracketIcon: React.FC<{ className?: string }> = ({ className = "h-6 w-6" }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 15" />
-    </svg>
-);
-
 const DocumentMagnifyingGlassIcon: React.FC<{ className?: string }> = ({ className = "h-6 w-6" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z M10.5 7.5v6m3-3h-6" />
@@ -87,24 +74,7 @@ const FileCodeIcon: React.FC<{ className?: string }> = ({ className = "h-6 w-6" 
 
 // --- GEMINI SERVICES & SCHEMAS ---
 
-const siteGenerationSchema = {
-    type: Type.OBJECT,
-    properties: {
-        files: {
-            type: Type.ARRAY,
-            description: "Масив об'єктів файлів для створення веб-сайту.",
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    fileName: { type: Type.STRING, description: "Назва файлу (наприклад, 'index.html', 'style.css')." },
-                    content: { type: Type.STRING, description: "Повний вміст файлу." }
-                },
-                required: ['fileName', 'content']
-            }
-        }
-    },
-    required: ['files']
-};
+const JARVIS_SYSTEM_INSTRUCTION = "Ти — J.A.R.V.I.S., професійний програміст та дебагер. Твоя мета — створювати та аналізувати код найвищої якості. Суворо дотримуйся запиту користувача, не додаючи нічого від себе. Твої відповіді мають бути точними, ефективними та чистими.";
 
 const analysisSchema = {
   type: Type.OBJECT,
@@ -140,29 +110,19 @@ const analysisSchema = {
   required: ['summary', 'files']
 };
 
-
-const generateSite = async (prompt: string, existingFiles: CodeFile[], apiKey: string): Promise<SiteGenerationResponse> => {
-    const ai = new GoogleGenAI({ apiKey });
-    const formattedFiles = existingFiles.map(file => `// FILE: ${file.name}\n${file.content}`).join('\n\n');
-    const fullPrompt = `Ти — експерт з веб-розробки. Створи або онови файли для веб-сайту на основі запиту користувача. Запит: "${prompt}". Існуючі файли:\n${formattedFiles}\nЗавжди створюй 'index.html' і правильно підключай до нього CSS та JS. Надай відповідь у форматі JSON.`;
-
-    const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
-        contents: fullPrompt,
-        config: { responseMimeType: "application/json", responseSchema: siteGenerationSchema },
-    });
-    return JSON.parse(response.text);
-};
-
 const analyzeCode = async (files: CodeFile[], apiKey: string): Promise<AnalysisReport> => {
     const ai = new GoogleGenAI({ apiKey });
     const formattedFiles = files.map(file => `// FILE: ${file.name}\n${file.content}`).join('\n\n');
-    const prompt = `Ти експерт з рецензування коду JavaScript. Проаналізуй наступні файли як єдиний проєкт, вияви синтаксичні, логічні помилки та проблеми з імпортами. Надай детальний звіт у форматі JSON українською мовою. Файли для аналізу:\n${formattedFiles}`;
+    const prompt = `Проаналізуй наступні файли як єдиний проєкт, вияви синтаксичні, логічні помилки та проблеми з імпортами. Надай детальний звіт у форматі JSON українською мовою. Файли для аналізу:\n${formattedFiles}`;
     
     const response = await ai.models.generateContent({
       model: "gemini-2.5-pro",
       contents: prompt,
-      config: { responseMimeType: "application/json", responseSchema: analysisSchema },
+      config: { 
+        systemInstruction: JARVIS_SYSTEM_INSTRUCTION,
+        responseMimeType: "application/json", 
+        responseSchema: analysisSchema 
+      },
     });
     return JSON.parse(response.text);
 };
@@ -243,12 +203,12 @@ const ChatPanel: React.FC<{ onGenerate: (prompt: string) => void, isLoading: boo
         <div className="h-full w-full flex flex-col p-4 gap-4">
             <div className="flex-grow flex flex-col items-center justify-center text-center text-slate-500">
                  <SparklesIcon className="h-16 w-16 mb-4 text-slate-600" />
-                 <h2 className="text-xl font-bold text-slate-300">Чат / Генерація</h2>
-                 <p className="mt-2 max-w-md text-slate-400 text-sm">Опишіть сайт, який ви хочете створити, або зміни, які потрібно внести.</p>
+                 <h2 className="text-xl font-bold text-slate-300">J.A.R.V.I.S. Чат</h2>
+                 <p className="mt-2 max-w-md text-slate-400 text-sm">Опишіть, що потрібно створити або змінити в активному файлі.</p>
             </div>
              {error && <div className="bg-red-900/50 text-red-300 p-3 rounded-md text-sm">{error}</div>}
             <div className="flex-shrink-0 flex items-center gap-2">
-                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }} placeholder="Ваш запит до AI..." className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" rows={2} disabled={isLoading}/>
+                <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }} placeholder="Ваш запит до J.A.R.V.I.S...." className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" rows={2} disabled={isLoading}/>
                 <button onClick={handleGenerate} disabled={isLoading || !prompt.trim()} className="p-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 disabled:bg-slate-600 transition-colors">
                     {isLoading ? <div className="w-5 h-5 border-2 border-t-transparent border-white rounded-full animate-spin"></div> : <PaperAirplaneIcon />}
                 </button>
@@ -264,14 +224,14 @@ const AnalysisPanel: React.FC<{ report: AnalysisReport | null; isLoading: boolea
         <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 p-4">
             <DocumentMagnifyingGlassIcon className="h-16 w-16 mb-4 text-slate-600" />
             <h2 className="text-xl font-bold text-slate-300">Аналіз коду</h2>
-            <p className="mt-2 max-w-md text-slate-400 text-sm">Натисніть кнопку "Аналізувати код", щоб перевірити файли на наявність помилок.</p>
+            <p className="mt-2 max-w-md text-slate-400 text-sm">Натисніть кнопку "Аналізувати код", щоб J.A.R.V.I.S. перевірив файли на помилки.</p>
         </div>
     );
     return (
       <div className="p-4 overflow-y-auto h-full">
         <h2 className="text-xl font-bold text-indigo-300 mb-3">Звіт про аналіз</h2>
         <div className="bg-slate-800/50 p-3 rounded-lg mb-4">
-          <h3 className="font-semibold text-slate-200 mb-1">Підсумок</h3>
+          <h3 className="font-semibold text-slate-200 mb-1">Підсумок від J.A.R.V.I.S.</h3>
           <p className="text-slate-400 text-sm">{report.summary}</p>
         </div>
         {report.files.map((file) => (
@@ -321,21 +281,43 @@ const App: React.FC = () => {
     const handleFileNameChange = (id: string, newName: string) => setFiles(files.map(f => (f.id === id ? { ...f, name: newName } : f)));
     const handleSaveApiKey = (key: string) => { setApiKey(key); setIsApiKeyModalOpen(false); setError(null); };
 
-    const handleGenerateSite = async (prompt: string) => {
+    const handleGenerateSiteStream = async (prompt: string) => {
         if (!apiKey) { setIsApiKeyModalOpen(true); return; }
+        if (!activeFileId) { setError("Будь ласка, оберіть файл для редагування."); return; }
+        
         setIsLoading(true); setLoadingAction('generate'); setError(null);
+        
         try {
-            const result = await generateSite(prompt, files, apiKey);
-            const updatedFiles = [...files];
-            result.files.forEach(genFile => {
-                const index = updatedFiles.findIndex(f => f.name === genFile.fileName);
-                const newFile = { ...updatedFiles[index] || { id: `file_${Date.now()}_${genFile.fileName}`, name: genFile.fileName }, content: genFile.content };
-                if (index !== -1) updatedFiles[index] = newFile; else updatedFiles.push(newFile);
+            const ai = new GoogleGenAI({ apiKey });
+            const chat: Chat = ai.chats.create({
+                model: 'gemini-2.5-pro',
+                config: { systemInstruction: JARVIS_SYSTEM_INSTRUCTION },
             });
-            setFiles(updatedFiles);
-            if (!activeFileId && updatedFiles.length > 0) setActiveFileId(updatedFiles.find(f => f.name.endsWith('.html'))?.id || updatedFiles[0].id);
-        } catch (err) { setError(err instanceof Error ? err.message : "Сталася невідома помилка."); } finally { setIsLoading(false); setLoadingAction(null); }
+
+            const fullPrompt = `Онови або повністю перепиши вміст поточного файлу (${activeFile?.name}) на основі цього запиту: "${prompt}". Поверни тільки код, без пояснень, форматування markdown чи назви файлу.`;
+            
+            // Clear content before streaming
+            handleCodeChange('');
+
+            const response = await chat.sendMessageStream({ message: fullPrompt });
+
+            for await (const chunk of response) {
+                // Append chunk to the current content
+                setFiles(currentFiles => 
+                    currentFiles.map(f => 
+                        f.id === activeFileId ? { ...f, content: f.content + chunk.text } : f
+                    )
+                );
+            }
+
+        } catch (err) { 
+            setError(err instanceof Error ? err.message : "Сталася невідома помилка під час генерації.");
+        } finally { 
+            setIsLoading(false); 
+            setLoadingAction(null); 
+        }
     };
+
 
     const handleAnalyzeCode = async () => {
         if (!apiKey) { setIsApiKeyModalOpen(true); return; }
@@ -362,20 +344,24 @@ const App: React.FC = () => {
                 </div>
             </header>
             <main className="flex-grow grid grid-cols-1 md:grid-cols-3 h-full min-h-0">
-                <div className="col-span-1 flex flex-col border-r border-slate-700">
-                    <FileTabs files={files} activeFileId={activeFileId} onAddFile={handleAddFile} onSelectFile={handleSelectFile} onRemoveFile={handleRemoveFile} onRenameFile={handleFileNameChange} />
-                    <div className="flex-grow h-full min-h-0">{activeFile ? <CodeEditor content={activeFile.content} onChange={handleCodeChange} /> : <div className="p-4 text-slate-500 text-center">Оберіть або створіть файл.</div>}</div>
-                </div>
                 <div className="col-span-1 border-r border-slate-700 flex flex-col bg-slate-800/40">
                     <div className="flex-shrink-0 flex border-b border-slate-700">
                         <button onClick={() => setActiveTab('chat')} className={`flex-1 p-3 text-sm font-semibold ${activeTab === 'chat' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-700/50'}`}>Чат / Генерація</button>
                         <button onClick={() => setActiveTab('analysis')} className={`flex-1 p-3 text-sm font-semibold ${activeTab === 'analysis' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-700/50'}`}>Аналіз коду</button>
                     </div>
                     <div className="flex-grow min-h-0">
-                        {activeTab === 'chat' ? <ChatPanel onGenerate={handleGenerateSite} isLoading={isLoading && loadingAction === 'generate'} error={error} /> : <AnalysisPanel report={analysisReport} isLoading={isLoading && loadingAction === 'analyze'} error={error} onApplyFix={handleApplyFix} />}
+                        {activeTab === 'chat' ? <ChatPanel onGenerate={handleGenerateSiteStream} isLoading={isLoading && loadingAction === 'generate'} error={error} /> : <AnalysisPanel report={analysisReport} isLoading={isLoading && loadingAction === 'analyze'} error={error} onApplyFix={handleApplyFix} />}
                     </div>
                 </div>
-                <div className="col-span-1"><Preview files={files} /></div>
+                <div className="col-span-2 flex flex-col h-full min-h-0">
+                    <div className="h-1/2 flex flex-col border-b border-slate-700">
+                        <FileTabs files={files} activeFileId={activeFileId} onAddFile={handleAddFile} onSelectFile={handleSelectFile} onRemoveFile={handleRemoveFile} onRenameFile={handleFileNameChange} />
+                        <div className="flex-grow h-full min-h-0">{activeFile ? <CodeEditor content={activeFile.content} onChange={handleCodeChange} /> : <div className="p-4 text-slate-500 text-center">Оберіть або створіть файл.</div>}</div>
+                    </div>
+                    <div className="h-1/2">
+                      <Preview files={files} />
+                    </div>
+                </div>
             </main>
         </div>
     );
