@@ -1,9 +1,9 @@
-
 import React, { useState, useMemo, useCallback } from 'react';
 import { FileTabs } from './components/FileTabs';
 import { CodeEditor } from './components/CodeEditor';
 import { AnalysisResult } from './components/AnalysisResult';
-import { SparklesIcon } from './components/icons';
+import { ApiKeyModal } from './components/ApiKeyModal';
+import { SparklesIcon, KeyIcon } from './components/icons';
 import { analyzeCode } from './services/geminiService';
 import { CodeFile, AnalysisReport } from './types';
 
@@ -19,6 +19,8 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [analysisReport, setAnalysisReport] = useState<AnalysisReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState<string>('');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(true);
 
   const activeFile = useMemo(() => files.find(f => f.id === activeFileId), [files, activeFileId]);
 
@@ -55,11 +57,17 @@ const App: React.FC = () => {
   };
 
   const handleAnalyze = useCallback(async () => {
+    if (!apiKey) {
+      setError("API ключ не встановлено. Будь ласка, введіть ключ.");
+      setIsApiKeyModalOpen(true);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setAnalysisReport(null);
     try {
-      const report = await analyzeCode(files);
+      const report = await analyzeCode(files, apiKey);
       setAnalysisReport(report);
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -70,20 +78,38 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [files]);
+  }, [files, apiKey]);
+
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    setIsApiKeyModalOpen(false);
+    if (error?.includes("API ключ")) {
+      setError(null);
+    }
+  };
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
+      {isApiKeyModalOpen && <ApiKeyModal onSave={handleSaveApiKey} />}
       <header className="flex-shrink-0 p-3 bg-gray-900/80 backdrop-blur-sm border-b border-gray-700/50 flex justify-between items-center">
         <h1 className="text-xl font-bold text-gray-200">Аналізатор коду JS Pro</h1>
-        <button
-          onClick={handleAnalyze}
-          disabled={isLoading}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed transition-colors duration-200 font-semibold"
-        >
-          <SparklesIcon className="h-5 w-5 mr-2" />
-          {isLoading ? 'Аналізую...' : 'Аналізувати код'}
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setIsApiKeyModalOpen(true)}
+            className="p-2 rounded-md hover:bg-gray-700 transition-colors"
+            title="Змінити API ключ"
+          >
+            <KeyIcon className="h-5 w-5 text-gray-400" />
+          </button>
+          <button
+            onClick={handleAnalyze}
+            disabled={isLoading || !apiKey}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:bg-gray-600/50 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors duration-200 font-semibold"
+          >
+            <SparklesIcon className="h-5 w-5 mr-2" />
+            {isLoading ? 'Аналізую...' : 'Аналізувати код'}
+          </button>
+        </div>
       </header>
       <main className="flex-grow flex h-full min-h-0">
         <div className="w-1/2 flex flex-col border-r border-gray-700">

@@ -1,14 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { CodeFile, AnalysisReport } from '../types';
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
-
 const analysisSchema = {
   type: Type.OBJECT,
   properties: {
@@ -64,10 +56,16 @@ const analysisSchema = {
   required: ['summary', 'files']
 };
 
-export const analyzeCode = async (files: CodeFile[]): Promise<AnalysisReport> => {
+export const analyzeCode = async (files: CodeFile[], apiKey: string): Promise<AnalysisReport> => {
+  if (!apiKey) {
+    throw new Error("API ключ не надано. Будь ласка, введіть ваш ключ, щоб продовжити.");
+  }
+  
   if (files.length === 0 || files.every(f => f.content.trim() === '')) {
     throw new Error("Немає коду для аналізу.");
   }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const formattedFiles = files.map(file => `
 // FILE: ${file.name}
