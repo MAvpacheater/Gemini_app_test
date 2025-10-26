@@ -1,5 +1,5 @@
 {
-  "name": "JS Code Analyzer Pro",
-  "description": "An intelligent JavaScript code analyzer that helps you identify and fix errors across multiple files simultaneously using the power of Gemini.",
+  "name": "AI Web Dev Hub",
+  "description": "A powerful AI-driven tool that combines a site generator and a code analyzer. Create, edit, and debug HTML, CSS, and JavaScript projects in one place with the help of Gemini.",
   "requestFramePermissions": []
 }
