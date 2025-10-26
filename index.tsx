@@ -276,6 +276,7 @@ const App = () => {
     setIsGenerating(true);
     setGenerationStep('planning');
     setChatHistory(prev => [...prev, { role: 'user', content: userPrompt }]);
+    setChatInput('');
     const ai = getAi();
     try {
       const response = await ai.models.generateContent({
@@ -303,11 +304,14 @@ const App = () => {
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
-        contents: `Generate the code for the following project plan. The user's original goal was: "${chatInput}". The agreed plan is: ${JSON.stringify(projectPlan)}. The user has provided final instructions: "${editablePlanPrompt}". Create all the necessary files with high-quality code. Ensure the HTML file links to the CSS and JS files correctly if they are created.`,
-        config: { systemInstruction: JARVIS_SYSTEM_INSTRUCTION, responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { files: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, content: { type: Type.STRING } } } } } } }
+        contents: `Generate the code for the following project plan. The user's original goal was: "${editablePlanPrompt.split('\n')[0]}". The agreed plan is: ${JSON.stringify(projectPlan)}. The user has provided final instructions: "${editablePlanPrompt}". Create all the necessary files with high-quality code. Ensure the HTML file links to the CSS and JS files correctly if they are created.`,
+        config: { systemInstruction: JARVIS_SYSTEM_INSTRUCTION, responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { files: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { fileName: { type: Type.STRING }, content: { type: Type.STRING } } } } } } }
       });
       const result = JSON.parse(response.text);
-      const newFiles: File[] = result.files;
+      const newFiles: File[] = result.files.map((file: { fileName: string; content: string }) => ({
+        name: file.fileName,
+        content: file.content,
+      }));
       setFiles(newFiles);
       setActiveFile(newFiles.find(f => f.name.endsWith('.html'))?.name || newFiles[0]?.name || null);
       setChatHistory(prev => [...prev, { role: 'assistant', content: "Проєкт створено. Ви можете переглянути файли в редакторі." }]);
