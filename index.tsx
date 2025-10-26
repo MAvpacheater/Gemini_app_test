@@ -65,6 +65,18 @@ const KeyIcon: React.FC<{ className?: string }> = ({ className = "h-6 w-6" }) =>
     </svg>
 );
 
+const ClipboardIcon: React.FC<{ className?: string }> = ({ className = "h-4 w-4" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a2.25 2.25 0 0 1-2.25 2.25h-1.5a2.25 2.25 0 0 1-2.25-2.25v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+  </svg>
+);
+
+const CheckIcon: React.FC<{ className?: string }> = ({ className = "h-4 w-4" }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+    </svg>
+);
+
 // --- From services/geminiService.ts ---
 const analysisSchema = {
   type: Type.OBJECT,
@@ -121,14 +133,16 @@ const analysisSchema = {
   required: ['summary', 'files']
 };
 
-// FIX: Update analyzeCode to use process.env.API_KEY and remove apiKey parameter.
-const analyzeCode = async (files: CodeFile[]): Promise<AnalysisReport> => {
+const analyzeCode = async (files: CodeFile[], apiKey: string): Promise<AnalysisReport> => {
+  if (!apiKey) {
+    throw new Error("API ключ не надано. Будь ласка, введіть ваш ключ, щоб продовжити.");
+  }
+  
   if (files.length === 0 || files.every(f => f.content.trim() === '')) {
     throw new Error("Немає коду для аналізу.");
   }
 
-  // FIX: Initialize GoogleGenAI with API key from environment variables.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   
   const formattedFiles = files.map(file => `
 // FILE: ${file.name}
@@ -176,51 +190,114 @@ ${file.content}
 
   } catch (error) {
     console.error("Error analyzing code with Gemini API:", error);
+    if (error instanceof Error && error.message.includes('API key not valid')) {
+        throw new Error("Наданий API ключ недійсний. Будь ласка, перевірте його та спробуйте знову.");
+    }
     throw new Error("Не вдалося отримати аналіз від сервера. Перевірте ваш API ключ та з'єднання з мережею.");
   }
 };
 
 
 // --- From components/ApiKeyModal.tsx ---
-// FIX: Removed ApiKeyModal component to adhere to the guideline of using environment variables for API keys.
+const ApiKeyModal: React.FC<{ onSave: (apiKey: string) => void; }> = ({ onSave }) => {
+  const [key, setKey] = React.useState('');
+
+  const handleSave = () => {
+    if (key.trim()) {
+      onSave(key.trim());
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+        handleSave();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-8 max-w-lg w-full m-4">
+        <div className="flex items-center mb-4">
+          <KeyIcon className="h-8 w-8 text-yellow-400 mr-3 flex-shrink-0" />
+          <h2 className="text-2xl font-bold text-white">Введіть ваш API ключ Gemini</h2>
+        </div>
+        <p className="text-slate-400 mb-6 text-sm">
+          Для аналізу коду потрібен ваш власний API ключ Google AI. Додаток не зберігає ваш ключ, він використовується лише для запитів протягом цієї сесії.
+        </p>
+        <div className="mb-6">
+          <label htmlFor="apiKey" className="block text-sm font-medium text-slate-300 mb-2">
+            API Ключ
+          </label>
+          <input
+            id="apiKey"
+            type="password"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Вставте ваш ключ тут..."
+            className="w-full bg-slate-900 border border-slate-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            autoFocus
+          />
+        </div>
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <a
+            href="https://aistudio.google.com/app/apikey"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-indigo-400 hover:underline"
+          >
+            Отримати API ключ
+          </a>
+          <button
+            onClick={handleSave}
+            disabled={!key.trim()}
+            className="w-full sm:w-auto px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 disabled:bg-slate-600 disabled:cursor-not-allowed font-semibold transition-colors"
+          >
+            Зберегти та продовжити
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 
 // --- From components/AnalysisResult.tsx ---
 const WelcomeMessage = () => (
-  <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
-    <SparklesIcon className="h-16 w-16 mb-4" />
-    <h2 className="text-2xl font-bold text-gray-300">Ласкаво просимо до Аналізатора коду JS Pro</h2>
-    <p className="mt-2 max-w-md">
+  <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 p-4">
+    <SparklesIcon className="h-16 w-16 mb-4 text-slate-600" />
+    <h2 className="text-2xl font-bold text-slate-300">Ласкаво просимо до Аналізатора коду JS Pro</h2>
+    <p className="mt-2 max-w-md text-slate-400">
       Додайте файли, напишіть код і натисніть "Аналізувати". Gemini проведе експертну перевірку, включаючи аналіз імпортів між файлами.
     </p>
   </div>
 );
 
 const LoadingSpinner = () => (
-  <div className="flex flex-col items-center justify-center h-full text-gray-400">
+  <div className="flex flex-col items-center justify-center h-full text-slate-400">
     <svg className="animate-spin h-10 w-10 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
     </svg>
     <p className="text-lg">Аналізуємо ваш код...</p>
-    <p className="text-sm text-gray-500 mt-1">Це може зайняти деякий час.</p>
+    <p className="text-sm text-slate-500 mt-1">Це може зайняти деякий час.</p>
   </div>
 );
 
 const ErrorDisplay: React.FC<{ message: string }> = ({ message }) => (
     <div className="flex flex-col items-center justify-center h-full text-center text-red-400 p-4">
         <h3 className="text-xl font-semibold mb-2">Помилка аналізу</h3>
-        <p className="bg-red-900/50 p-3 rounded-md text-sm">{message}</p>
+        <p className="bg-red-900/50 p-3 rounded-md text-sm max-w-md">{message}</p>
     </div>
 );
 
 
 const ReportDisplay: React.FC<{ report: AnalysisReport }> = ({ report }) => (
-    <div className="p-6">
-        <h2 className="text-2xl font-bold text-blue-300 mb-4 border-b border-gray-700 pb-2">Звіт про аналіз</h2>
-        <div className="bg-gray-800/50 p-4 rounded-lg mb-6">
-            <h3 className="text-lg font-semibold text-gray-200 mb-2">Підсумок</h3>
-            <p className="text-gray-400 text-sm leading-relaxed">{report.summary}</p>
+    <div className="p-4 sm:p-6">
+        <h2 className="text-2xl font-bold text-indigo-300 mb-4 border-b border-slate-700 pb-2">Звіт про аналіз</h2>
+        <div className="bg-slate-800/50 p-4 rounded-lg mb-6 shadow-md">
+            <h3 className="text-lg font-semibold text-slate-200 mb-2">Підсумок</h3>
+            <p className="text-slate-400 text-sm leading-relaxed">{report.summary}</p>
         </div>
         {report.files.map((file, index) => (
             <FileResult key={index} file={file} />
@@ -228,34 +305,61 @@ const ReportDisplay: React.FC<{ report: AnalysisReport }> = ({ report }) => (
     </div>
 );
 
+const CodeBlock: React.FC<{ title: string; code: string }> = ({ title, code }) => {
+    const [copied, setCopied] = React.useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(code).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
+    return (
+        <div className="mt-4 bg-slate-900 rounded-md border border-slate-700 shadow-inner">
+            <div className="flex justify-between items-center px-4 py-2 bg-slate-800/50 rounded-t-md border-b border-slate-700">
+                <p className="text-xs text-slate-400 font-sans font-medium">{title}</p>
+                <button onClick={handleCopy} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-slate-700">
+                    {copied ? <CheckIcon /> : <ClipboardIcon />}
+                    {copied ? 'Скопійовано!' : 'Копіювати'}
+                </button>
+            </div>
+            <div className="max-h-80 overflow-y-auto p-4">
+                <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono">
+                    <code>{code}</code>
+                </pre>
+            </div>
+        </div>
+    );
+};
+
+
 const FileResult: React.FC<{ file: FileAnalysis }> = ({ file }) => {
     const [isCodeVisible, setIsCodeVisible] = React.useState(false);
 
     return (
-      <div className="mb-6">
-        <div className="flex items-center text-xl font-semibold text-gray-100 mb-3">
-            <FileCodeIcon className="h-5 w-5 mr-2 text-gray-400"/>
+      <div className="mb-6 bg-slate-800/70 p-4 rounded-lg shadow-lg">
+        <div className="flex items-center text-xl font-semibold text-slate-100 mb-3">
+            <FileCodeIcon className="h-5 w-5 mr-2 text-slate-400"/>
             <h3>{file.fileName}</h3>
         </div>
         {file.errors.length > 0 ? (
           <div className="space-y-4">
             {file.errors.map((err, index) => (
-              <div key={index} className="bg-gray-800 border-l-4 border-yellow-500 rounded-r-lg p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <p className="font-mono text-sm text-red-400">
+              <div key={index} className="bg-slate-900/50 border-l-4 border-yellow-500 rounded-r-lg p-4">
+                <p className="font-mono text-sm text-red-400 mb-2">
                     Рядок {err.line}: <span className="font-semibold text-yellow-400">{err.errorType}</span>
-                  </p>
-                </div>
-                <p className="text-gray-300 text-sm mb-2">{err.message}</p>
-                <div className="mt-2 pt-2 border-t border-gray-700">
-                    <p className="text-xs text-gray-400 mb-1 font-semibold">Пропозиція:</p>
-                    <p className="font-mono text-sm text-green-400 bg-gray-900 p-2 rounded">{err.suggestion}</p>
+                </p>
+                <p className="text-slate-300 text-sm mb-3">{err.message}</p>
+                <div className="mt-2 pt-2 border-t border-slate-700">
+                    <p className="text-xs text-slate-400 mb-1 font-semibold">Пропозиція:</p>
+                    <p className="font-mono text-sm text-green-400 bg-slate-800 p-2 rounded">{err.suggestion}</p>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="bg-gray-800/50 border-l-4 border-green-500 rounded-r-lg p-4">
+          <div className="bg-slate-800 border-l-4 border-green-500 rounded-r-lg p-4">
             <p className="text-green-400">У цьому файлі проблем не знайдено. Чудова робота!</p>
           </div>
         )}
@@ -264,18 +368,12 @@ const FileResult: React.FC<{ file: FileAnalysis }> = ({ file }) => {
             <div className="mt-4">
                 <button
                     onClick={() => setIsCodeVisible(!isCodeVisible)}
-                    className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium px-3 py-1.5 rounded-md hover:bg-blue-500/10"
+                    className="flex items-center gap-2 text-sm text-indigo-400 hover:text-indigo-300 transition-colors font-medium px-3 py-1.5 rounded-md hover:bg-indigo-500/10"
                 >
                     <CodeBracketIcon className="h-5 w-5" />
                     {isCodeVisible ? 'Сховати виправлений код' : 'Показати виправлений код'}
                 </button>
-                {isCodeVisible && (
-                    <div className="mt-2 bg-gray-900 p-3 rounded-md border border-gray-700 max-h-96 overflow-y-auto">
-                        <pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono">
-                            <code>{file.correctedCode}</code>
-                        </pre>
-                    </div>
-                )}
+                {isCodeVisible && <CodeBlock title={file.fileName} code={file.correctedCode} />}
             </div>
         )}
       </div>
@@ -284,7 +382,7 @@ const FileResult: React.FC<{ file: FileAnalysis }> = ({ file }) => {
 
 const AnalysisResult: React.FC<any> = ({ report, isLoading, error }) => {
   return (
-    <div className="h-full w-full bg-gray-800/30 overflow-y-auto">
+    <div className="h-full w-full bg-slate-800/40 overflow-y-auto">
       {isLoading ? (
         <LoadingSpinner />
       ) : error ? (
@@ -302,12 +400,12 @@ const AnalysisResult: React.FC<any> = ({ report, isLoading, error }) => {
 // --- From components/CodeEditor.tsx ---
 const CodeEditor: React.FC<any> = ({ content, onChange }) => {
   return (
-    <div className="h-full w-full bg-gray-900">
+    <div className="h-full w-full bg-slate-900">
       <textarea
         value={content}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Вставте ваш JavaScript код сюди..."
-        className="w-full h-full bg-transparent text-gray-300 p-4 font-mono text-sm resize-none focus:outline-none leading-relaxed"
+        className="w-full h-full bg-transparent text-slate-300 p-4 font-mono text-sm resize-none focus:outline-none leading-relaxed"
         spellCheck="false"
       />
     </div>
@@ -355,17 +453,17 @@ const FileTabs: React.FC<any> = ({
   };
 
   return (
-    <div className="flex items-center border-b border-gray-700 bg-gray-800/50">
+    <div className="flex items-center border-b border-slate-700 bg-slate-800/50">
       <div className="flex-grow flex items-center overflow-x-auto">
         {files.map((file) => (
           <div
             key={file.id}
             onClick={() => onSelectFile(file.id)}
             onDoubleClick={() => handleDoubleClick(file)}
-            className={`flex items-center justify-between px-4 py-2 border-r border-gray-700 cursor-pointer transition-colors duration-200 whitespace-nowrap ${
+            className={`flex items-center justify-between px-4 py-2 border-r border-slate-700 cursor-pointer transition-colors duration-200 whitespace-nowrap ${
               activeFileId === file.id
-                ? 'bg-blue-600/30 text-blue-300 border-b-2 border-blue-400'
-                : 'hover:bg-gray-700/50'
+                ? 'bg-indigo-600/30 text-indigo-300 border-b-2 border-indigo-400'
+                : 'hover:bg-slate-700/50'
             }`}
           >
             {editingTabId === file.id ? (
@@ -376,7 +474,7 @@ const FileTabs: React.FC<any> = ({
                 onChange={(e) => setEditingName(e.target.value)}
                 onBlur={handleRename}
                 onKeyDown={handleKeyDown}
-                className="bg-gray-900 text-white outline-none p-0 m-0 text-sm w-24"
+                className="bg-slate-900 text-white outline-none p-0 m-0 text-sm w-24"
               />
             ) : (
               <span className="text-sm mr-2">{file.name}</span>
@@ -386,7 +484,7 @@ const FileTabs: React.FC<any> = ({
                 e.stopPropagation();
                 onRemoveFile(file.id);
               }}
-              className="p-0.5 rounded-full hover:bg-gray-600 text-gray-400 hover:text-white transition-colors"
+              className="p-0.5 rounded-full hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"
             >
               <XIcon className="h-3 w-3" />
             </button>
@@ -395,7 +493,7 @@ const FileTabs: React.FC<any> = ({
       </div>
       <button
         onClick={onAddFile}
-        className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
       >
         <PlusIcon className="h-5 w-5" />
       </button>
@@ -417,7 +515,8 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [analysisReport, setAnalysisReport] = React.useState<AnalysisReport | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  // FIX: Removed state for API key and modal to use environment variables.
+  const [apiKey, setApiKey] = React.useState<string>('');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = React.useState<boolean>(true);
 
   const activeFile = React.useMemo(() => files.find(f => f.id === activeFileId), [files, activeFileId]);
 
@@ -453,14 +552,18 @@ const App: React.FC = () => {
     setFiles(files.map(f => (f.id === id ? { ...f, name: newName } : f)));
   };
 
-  // FIX: Updated handleAnalyze to remove API key logic.
   const handleAnalyze = React.useCallback(async () => {
+    if (!apiKey) {
+      setError("API ключ не встановлено. Будь ласка, введіть ключ.");
+      setIsApiKeyModalOpen(true);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setAnalysisReport(null);
     try {
-      // FIX: Call analyzeCode without passing the API key.
-      const report = await analyzeCode(files);
+      const report = await analyzeCode(files, apiKey);
       setAnalysisReport(report);
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -471,30 +574,41 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [files]);
+  }, [files, apiKey]);
 
-  // FIX: Removed handleSaveApiKey function.
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    setIsApiKeyModalOpen(false);
+    if (error?.includes("API ключ")) {
+      setError(null);
+    }
+  };
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gray-900 text-white">
-      {/* FIX: Removed ApiKeyModal component. */}
-      <header className="flex-shrink-0 p-3 bg-gray-900/80 backdrop-blur-sm border-b border-gray-700/50 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-200">Аналізатор коду JS Pro</h1>
+    <div className="h-screen w-screen flex flex-col bg-slate-900 text-white">
+      {isApiKeyModalOpen && <ApiKeyModal onSave={handleSaveApiKey} />}
+      <header className="flex-shrink-0 p-3 bg-slate-900/80 backdrop-blur-sm border-b border-slate-700/50 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-slate-200">Аналізатор коду JS Pro</h1>
         <div className="flex items-center gap-4">
-          {/* FIX: Removed button to change API key. */}
+           <button
+            onClick={() => setIsApiKeyModalOpen(true)}
+            className="p-2 rounded-md hover:bg-slate-700 transition-colors"
+            title="Змінити API ключ"
+          >
+            <KeyIcon className="h-5 w-5 text-slate-400" />
+          </button>
           <button
             onClick={handleAnalyze}
-            // FIX: The button is disabled only when loading.
-            disabled={isLoading}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:bg-gray-600/50 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors duration-200 font-semibold"
+            disabled={isLoading || !apiKey}
+            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-500 disabled:bg-slate-600/50 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors duration-200 font-semibold"
           >
             <SparklesIcon className="h-5 w-5 mr-2" />
             {isLoading ? 'Аналізую...' : 'Аналізувати код'}
           </button>
         </div>
       </header>
-      <main className="flex-grow flex h-full min-h-0">
-        <div className="w-1/2 flex flex-col border-r border-gray-700">
+      <main className="flex-grow flex flex-col md:flex-row h-full min-h-0">
+        <div className="w-full md:w-1/2 flex flex-col border-r border-slate-700">
           <FileTabs
             files={files}
             activeFileId={activeFileId}
@@ -512,7 +626,7 @@ const App: React.FC = () => {
             )}
           </div>
         </div>
-        <div className="w-1/2">
+        <div className="w-full md:w-1/2">
           <AnalysisResult report={analysisReport} isLoading={isLoading} error={error} />
         </div>
       </main>
