@@ -351,15 +351,35 @@ const App = () => {
     const ai = getAi();
     try {
         const generatedFiles: File[] = [];
+        let generatedFilesContext = '';
+
         for (const fileToGenerate of projectPlan.files) {
             setChatHistory(prev => [...prev, { role: 'system', content: `Генерую ${fileToGenerate.fileName}...` }]);
+            
+            const prompt = `
+The user's original goal was: "${editablePlanPrompt.split('\n')[0]}".
+The project plan is: '${projectPlan.description}'.
+
+So far, the following files have been generated:
+---
+${generatedFilesContext.trim() ? generatedFilesContext : 'None yet.'}
+---
+
+Now, generate ONLY the raw code for the next file in the plan: '${fileToGenerate.fileName}'.
+The specific purpose of this file is: '${fileToGenerate.description}'.
+
+Do not include any explanation, markdown, or anything else. Just the code.
+`.trim();
+
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: `Generate ONLY the raw code for the file named '${fileToGenerate.fileName}'. This file is part of the project '${projectPlan.projectName}' (${projectPlan.description}). The specific purpose of this file is: '${fileToGenerate.description}'. The user's original goal was: "${editablePlanPrompt.split('\n')[0]}". Do not include any explanation, markdown, or anything else. Just the code.`,
+                model: 'gemini-2.5-pro',
+                contents: prompt,
                 config: { systemInstruction: JARVIS_SYSTEM_INSTRUCTION }
             });
             const newFile: File = { name: fileToGenerate.fileName, content: response.text.trim() };
             generatedFiles.push(newFile);
+            generatedFilesContext += `\n\n--- FILE: ${newFile.name} ---\n${newFile.content}`;
+            
             setFiles([...generatedFiles]);
             setActiveFile(newFile.name);
             await new Promise(res => setTimeout(res, 200));
@@ -389,9 +409,24 @@ const App = () => {
     setChatHistory(prev => [...prev, { role: 'user', content: userPrompt }]);
     const ai = getAi();
     try {
+        const fullProjectContext = files.map(f => `--- FILE: ${f.name} ---\n\n${f.content}`).join('\n\n---\n\n');
+
+        const prompt = `
+The user wants to edit the project. The full context of all project files is below:
+---
+${fullProjectContext}
+---
+
+The user is currently viewing and editing the file named '${activeFile}'.
+Their specific instruction is: "${userPrompt}".
+
+Based on this instruction and the full project context, provide the complete, updated raw code ONLY for the '${activeFile}'.
+Do not output code for other files. Do not include explanations or markdown. Just the raw code for '${activeFile}'.
+`.trim();
+
         const responseStream = await ai.models.generateContentStream({
-            model: 'gemini-2.5-flash',
-            contents: `The user wants to edit the file named '${activeFile}'. The current content is:\n\n${activeFileContent}\n\nTheir instruction is: "${userPrompt}".\n\nProvide the complete, updated raw code for the file.`,
+            model: 'gemini-2.5-pro',
+            contents: prompt,
             config: { systemInstruction: JARVIS_SYSTEM_INSTRUCTION }
         });
         let accumulatedContent = '';
